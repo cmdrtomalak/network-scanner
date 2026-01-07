@@ -436,13 +436,18 @@ impl App {
                     }
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    if self.sniffer_scroll < self.sniffer_packets.len().saturating_sub(1) {
+                    let filtered_count = self.filtered_packets().len();
+                    if self.sniffer_scroll < filtered_count.saturating_sub(1) {
                         self.sniffer_scroll += 1;
                     }
                 }
                 KeyCode::Enter => {
-                    let expanded = self.sniffer_expanded.entry(self.sniffer_scroll).or_insert(false);
-                    *expanded = !*expanded;
+                    // Get the original packet index from the filtered list
+                    let filtered = self.filtered_packets();
+                    if let Some((original_idx, _)) = filtered.get(self.sniffer_scroll) {
+                        let expanded = self.sniffer_expanded.entry(*original_idx).or_insert(false);
+                        *expanded = !*expanded;
+                    }
                 }
                 KeyCode::Char('e') => {
                     self.export_packets().await;
