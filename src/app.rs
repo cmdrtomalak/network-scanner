@@ -555,65 +555,165 @@ impl App {
     }
 
     /// Get packets filtered by the current filter string
-    /// Filter matches on: port numbers, protocol names, IP addresses, service names
+    /// Supports BPF-like syntax: 'port 80', 'host 192.168.1.1', 'tcp', 'udp'
+    /// Also supports simple text matching as fallback
     pub fn filtered_packets(&self) -> Vec<(usize, &CapturedPacket)> {
         if self.sniffer_filter.is_empty() {
             return self.sniffer_packets.iter().enumerate().collect();
         }
 
-        let filter = self.sniffer_filter.to_lowercase();
+        let filter = self.sniffer_filter.trim().to_lowercase();
 
         self.sniffer_packets
             .iter()
             .enumerate()
-            .filter(|(_, packet)| {
-                // Check port numbers
-                if let Some(src_port) = packet.src_port {
-                    if src_port.to_string().contains(&filter) {
+            .filter(|(_, packet)| self.packet_matches_filter(packet, &filter))
+            .collect()
+    }
+
+    /// Check if a packet matches the filter expression
+    fn packet_matches_filter(&self, packet: &CapturedPacket, filter: &str) -> bool {
+        // Parse BPF-like syntax
+        let parts: Vec<&str> = filter.split_whitespace().collect();
+
+        match parts.as_slice() {
+            // "port 80" - matches src or dst port
+            ["port", port_str] => {
+                if let Ok(port) = port_str.parse::<u16>() {
+                    return packet.src_port == Some(port) || packet.dst_port == Some(port);
+                }
+                false
+            }
+            // "src port 80" - matches source port only
+            ["src", "port", port_str] => {
+                if let Ok(port) = port_str.parse::<u16>() {
+                    return packet.src_port == Some(port);
+                }
+                false
+            }
+            // "dst port 80" - matches destination port only
+            ["dst", "port", port_str] => {
+                if let Ok(port) = port_str.parse::<u16>() {
+                    return packet.dst_port == Some(port);
+                }
+                false
+            }
+            // "host 192.168.1.1" - matches src or dst IP
+            ["host", ip_str] => {
+                if let Some(ref src_ip) = packet.ip_src {
+                    if src_ip.to_string() == *ip_str || src_ip.to_string().starts_with(ip_str) {
                         return true;
                     }
                 }
-                if let Some(dst_port) = packet.dst_port {
-                    if dst_port.to_string().contains(&filter) {
+                if let Some(ref dst_ip) = packet.ip_dst {
+                    if dst_ip.to_string() == *ip_str || dst_ip.to_string().starts_with(ip_str) {
+                        return true;
+                    }
+                }
+                false
+            }
+            // "src host 192.168.1.1" - matches source IP only
+            ["src", "host", ip_str] | ["src", ip_str] => {
+                if let Some(ref src_ip) = packet.ip_src {
+                    return src_ip.to_string() == *ip_str || src_ip.to_string().starts_with(ip_str);
+                }
+                false
+            }
+            // "dst host 192.168.1.1" - matches destination IP only
+            ["dst", "host", ip_str] | ["dst", ip_str] => {
+                if let Some(ref dst_ip) = packet.ip_dst {
+                    return dst_ip.to_string() == *ip_str || dst_ip.to_string().starts_with(ip_str);
+                }
+                false
+            }
+            // "net 192.168.1" - matches network prefix on src or dst
+            ["net", net_str] => {
+                if let Some(ref src_ip) = packet.ip_src {
+                    if src_ip.to_string().starts_with(net_str) {
+                        return true;
+                    }
+                }
+                if let Some(ref dst_ip) = packet.ip_dst {
+                    if dst_ip.to_string().starts_with(net_str) {
+                        return true;
+                    }
+                }
+                false
+            }
+            // Single word filters
+            [single] => {
+                // Protocol names
+                match *single {
+                    "tcp" => return packet.transport_protocol == crate::capture::packet::TransportProtocol::Tcp,
+                    "udp" => return packet.transport_protocol == crate::capture::packet::TransportProtocol::Udp,
+                    "icmp" => return packet.transport_protocol == crate::capture::packet::TransportProtocol::Icmp,
+                    _ => {}
+                }
+
+                // Try as port number
+                if let Ok(port) = single.parse::<u16>() {
+                    if packet.src_port == Some(port) || packet.dst_port == Some(port) {
                         return true;
                     }
                 }
 
-                // Check protocol
-                let proto = format!("{:?}", packet.transport_protocol).to_lowercase();
-                if proto.contains(&filter) {
-                    return true;
-                }
-
-                // Check IP addresses
-                if let Some(ref ip) = packet.ip_src {
-                    if ip.to_string().contains(&filter) {
+                // Try as IP address or prefix
+                if let Some(ref src_ip) = packet.ip_src {
+                    if src_ip.to_string().contains(single) {
                         return true;
                     }
                 }
-                if let Some(ref ip) = packet.ip_dst {
-                    if ip.to_string().contains(&filter) {
+                if let Some(ref dst_ip) = packet.ip_dst {
+                    if dst_ip.to_string().contains(single) {
                         return true;
                     }
                 }
 
                 // Check service/pattern match
                 if let Some(ref pattern) = packet.pattern_match {
-                    if pattern.to_lowercase().contains(&filter) {
+                    if pattern.to_lowercase().contains(single) {
                         return true;
                     }
                 }
-
-                // Check inferred service
                 if let Some(ref service) = packet.service_hint {
-                    if service.to_lowercase().contains(&filter) {
+                    if service.to_lowercase().contains(single) {
                         return true;
                     }
                 }
 
                 false
-            })
-            .collect()
+            }
+            // Fallback: simple contains matching on all fields
+            _ => {
+                let filter_combined = filter;
+
+                // Check ports
+                if let Some(src_port) = packet.src_port {
+                    if src_port.to_string().contains(filter_combined) {
+                        return true;
+                    }
+                }
+                if let Some(dst_port) = packet.dst_port {
+                    if dst_port.to_string().contains(filter_combined) {
+                        return true;
+                    }
+                }
+
+                // Check IPs
+                if let Some(ref ip) = packet.ip_src {
+                    if ip.to_string().contains(filter_combined) {
+                        return true;
+                    }
+                }
+                if let Some(ref ip) = packet.ip_dst {
+                    if ip.to_string().contains(filter_combined) {
+                        return true;
+                    }
+                }
+
+                false
+            }
+        }
     }
 
     async fn export_dashboard(&mut self) {
