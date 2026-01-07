@@ -5,9 +5,12 @@ use ratatui::{
 
 use crate::app::{App, InputMode, ScannerFocus};
 use crate::scanner::{PortState, ServiceProbeLevel};
-use super::theme::THEME;
+use super::get_theme;
+use super::theme::Theme;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
+    let theme = get_theme(app);
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -18,39 +21,39 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         ])
         .split(area);
 
-    draw_target_input(frame, app, chunks[0]);
-    draw_port_input(frame, app, chunks[1]);
-    draw_options(frame, app, chunks[2]);
-    draw_results(frame, app, chunks[3]);
+    draw_target_input(frame, app, chunks[0], &theme);
+    draw_port_input(frame, app, chunks[1], &theme);
+    draw_options(frame, app, chunks[2], &theme);
+    draw_results(frame, app, chunks[3], &theme);
 }
 
-fn draw_target_input(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_target_input(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let is_focused = app.scanner_input_mode == InputMode::Editing
         && app.scanner_focus == ScannerFocus::Target;
 
     let border_style = if is_focused {
-        Style::default().fg(THEME.border_focused)
+        Style::default().fg(theme.border_focused)
     } else {
-        Style::default().fg(THEME.border)
+        Style::default().fg(theme.border)
     };
 
     let block = Block::default()
         .title(" Target (hostname or IP) - press 'i' to edit ")
-        .title_style(Style::default().fg(if is_focused { THEME.accent } else { THEME.fg_dim }))
+        .title_style(Style::default().fg(if is_focused { theme.accent } else { theme.fg_dim }))
         .borders(Borders::ALL)
         .border_style(border_style);
 
     let input_text = if app.scanner_input.is_empty() && !is_focused {
-        Span::styled("e.g., 192.168.1.1 or example.com", Style::default().fg(THEME.fg_dim))
+        Span::styled("e.g., 192.168.1.1 or example.com", Style::default().fg(theme.fg_dim))
     } else {
-        Span::styled(&app.scanner_input, Style::default().fg(THEME.fg))
+        Span::styled(&app.scanner_input, Style::default().fg(theme.fg))
     };
 
     let paragraph = Paragraph::new(Line::from(vec![
         Span::raw(" "),
         input_text,
         if is_focused {
-            Span::styled("█", Style::default().fg(THEME.accent))
+            Span::styled("█", Style::default().fg(theme.accent))
         } else {
             Span::raw("")
         },
@@ -60,14 +63,14 @@ fn draw_target_input(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
-fn draw_port_input(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_port_input(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let is_focused = app.scanner_input_mode == InputMode::Editing
         && app.scanner_focus == ScannerFocus::Ports;
 
     let border_style = if is_focused {
-        Style::default().fg(THEME.border_focused)
+        Style::default().fg(theme.border_focused)
     } else {
-        Style::default().fg(THEME.border)
+        Style::default().fg(theme.border)
     };
 
     // Show current selection and custom input option
@@ -83,21 +86,21 @@ fn draw_port_input(frame: &mut Frame, app: &App, area: Rect) {
 
     let block = Block::default()
         .title(title)
-        .title_style(Style::default().fg(if is_focused { THEME.accent } else { THEME.fg_dim }))
+        .title_style(Style::default().fg(if is_focused { theme.accent } else { theme.fg_dim }))
         .borders(Borders::ALL)
         .border_style(border_style);
 
     let input_text = if app.scanner_port_input.is_empty() && !is_focused {
-        Span::styled("Custom: 22,80,443 or 1-1024 or 80", Style::default().fg(THEME.fg_dim))
+        Span::styled("Custom: 22,80,443 or 1-1024 or 80", Style::default().fg(theme.fg_dim))
     } else {
-        Span::styled(&app.scanner_port_input, Style::default().fg(THEME.fg))
+        Span::styled(&app.scanner_port_input, Style::default().fg(theme.fg))
     };
 
     let paragraph = Paragraph::new(Line::from(vec![
         Span::raw(" "),
         input_text,
         if is_focused {
-            Span::styled("█", Style::default().fg(THEME.accent))
+            Span::styled("█", Style::default().fg(theme.accent))
         } else {
             Span::raw("")
         },
@@ -107,10 +110,10 @@ fn draw_port_input(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
-fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_options(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(THEME.border));
+        .border_style(Style::default().fg(theme.border));
 
     let port_range_str = app.scanner_port_range.display_name();
     let probe_str = match app.scanner_probe_level {
@@ -119,17 +122,17 @@ fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let status = if app.scanner_running {
-        Span::styled(" ● Scanning...", Style::default().fg(THEME.warning))
+        Span::styled(" ● Scanning...", Style::default().fg(theme.warning))
     } else {
-        Span::styled(" ○ Ready", Style::default().fg(THEME.success))
+        Span::styled(" ○ Ready", Style::default().fg(theme.success))
     };
 
     let content = Line::from(vec![
-        Span::styled(" Active: ", Style::default().fg(THEME.fg_dim)),
-        Span::styled(port_range_str, Style::default().fg(THEME.accent)),
+        Span::styled(" Active: ", Style::default().fg(theme.fg_dim)),
+        Span::styled(port_range_str, Style::default().fg(theme.accent)),
         Span::raw("  │  "),
-        Span::styled("Detection: ", Style::default().fg(THEME.fg_dim)),
-        Span::styled(probe_str, Style::default().fg(THEME.accent)),
+        Span::styled("Detection: ", Style::default().fg(theme.fg_dim)),
+        Span::styled(probe_str, Style::default().fg(theme.accent)),
         Span::raw("  │  "),
         status,
     ]);
@@ -138,12 +141,12 @@ fn draw_options(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
-fn draw_results(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_results(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let block = Block::default()
         .title(format!(" Scan Results ({} open ports) ", app.scanner_results.len()))
-        .title_style(Style::default().fg(THEME.fg_dim))
+        .title_style(Style::default().fg(theme.fg_dim))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(THEME.border));
+        .border_style(Style::default().fg(theme.border));
 
     if app.scanner_results.is_empty() {
         let message = if app.scanner_running {
@@ -156,7 +159,7 @@ fn draw_results(frame: &mut Frame, app: &App, area: Rect) {
 
         let paragraph = Paragraph::new(message)
             .block(block)
-            .style(Style::default().fg(THEME.fg_dim))
+            .style(Style::default().fg(theme.fg_dim))
             .alignment(Alignment::Center);
 
         frame.render_widget(paragraph, area);
@@ -171,7 +174,7 @@ fn draw_results(frame: &mut Frame, app: &App, area: Rect) {
         Span::styled(
             format!(" {:>5} │ {:8} │ {:15} │ {:20} │ Banner",
                 "Port", "State", "Service", "Version"),
-            Style::default().fg(THEME.fg_dim),
+            Style::default().fg(theme.fg_dim),
         ),
     ]);
 
@@ -188,9 +191,9 @@ fn draw_results(frame: &mut Frame, app: &App, area: Rect) {
         .skip(app.scanner_scroll)
         .map(|(i, result)| {
             let state_style = match result.state {
-                PortState::Open => Style::default().fg(THEME.success),
-                PortState::Closed => Style::default().fg(THEME.error),
-                PortState::Filtered => Style::default().fg(THEME.warning),
+                PortState::Open => Style::default().fg(theme.success),
+                PortState::Closed => Style::default().fg(theme.error),
+                PortState::Filtered => Style::default().fg(theme.warning),
             };
 
             let state_str = match result.state {
@@ -208,14 +211,14 @@ fn draw_results(frame: &mut Frame, app: &App, area: Rect) {
                 Span::raw(format!(" {:>5} │ ", result.port)),
                 Span::styled(format!("{:8}", state_str), state_style),
                 Span::raw(" │ "),
-                Span::styled(format!("{:15}", service), Style::default().fg(THEME.accent)),
+                Span::styled(format!("{:15}", service), Style::default().fg(theme.accent)),
                 Span::raw(" │ "),
                 Span::raw(format!("{:20} │ ", version)),
-                Span::styled(banner_truncated, Style::default().fg(THEME.fg_dim)),
+                Span::styled(banner_truncated, Style::default().fg(theme.fg_dim)),
             ]);
 
             let style = if i == app.scanner_scroll {
-                Style::default().bg(THEME.selection_bg)
+                Style::default().bg(theme.selection_bg)
             } else {
                 Style::default()
             };

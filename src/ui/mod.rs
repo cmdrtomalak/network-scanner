@@ -2,15 +2,21 @@ mod dashboard;
 mod scanner;
 mod sniffer;
 mod shortcuts;
-mod theme;
+pub mod theme;
 
 use ratatui::prelude::*;
 
 use crate::app::{App, Tab};
+use theme::Theme;
 
-pub use theme::THEME;
+/// Get the current theme from the app
+pub fn get_theme(app: &App) -> Theme {
+    app.theme.theme()
+}
 
 pub fn draw(frame: &mut Frame, app: &App) {
+    let theme = get_theme(app);
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -21,7 +27,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         .split(frame.area());
 
     // Draw tab bar
-    draw_tabs(frame, app, chunks[0]);
+    draw_tabs(frame, app, chunks[0], &theme);
 
     // Draw main content based on current tab
     match app.current_tab {
@@ -38,8 +44,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
         let area = centered_rect(60, 3, frame.area());
         let block = ratatui::widgets::Block::default()
             .borders(ratatui::widgets::Borders::ALL)
-            .border_style(Style::default().fg(THEME.accent))
-            .style(Style::default().bg(THEME.bg));
+            .border_style(Style::default().fg(theme.accent))
+            .style(Style::default().bg(theme.bg));
         let paragraph = ratatui::widgets::Paragraph::new(msg.as_str())
             .block(block)
             .alignment(Alignment::Center);
@@ -48,16 +54,16 @@ pub fn draw(frame: &mut Frame, app: &App) {
     }
 }
 
-fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_tabs(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     use ratatui::widgets::{Block, Borders, Tabs};
 
     let titles: Vec<Line> = [Tab::Dashboard, Tab::PortScanner, Tab::PacketSniffer]
         .iter()
         .map(|t| {
             let style = if *t == app.current_tab {
-                Style::default().fg(THEME.accent).add_modifier(Modifier::BOLD)
+                Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(THEME.fg_dim)
+                Style::default().fg(theme.fg_dim)
             };
             Line::from(Span::styled(t.title(), style))
         })
@@ -67,13 +73,13 @@ fn draw_tabs(frame: &mut Frame, app: &App, area: Rect) {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(THEME.border))
-                .title(" NetScanner ")
-                .title_style(Style::default().fg(THEME.accent).add_modifier(Modifier::BOLD)),
+                .border_style(Style::default().fg(theme.border))
+                .title(format!(" NetScanner [{}] ", app.theme.name()))
+                .title_style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD)),
         )
         .select(app.current_tab as usize)
-        .style(Style::default().fg(THEME.fg))
-        .highlight_style(Style::default().fg(THEME.accent).add_modifier(Modifier::BOLD))
+        .style(Style::default().fg(theme.fg))
+        .highlight_style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD))
         .divider(Span::raw(" │ "));
 
     frame.render_widget(tabs, area);

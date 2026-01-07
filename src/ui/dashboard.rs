@@ -5,9 +5,12 @@ use ratatui::{
 
 use crate::app::{App, DashboardPanel};
 use crate::network::connection::get_service_name;
-use super::theme::THEME;
+use super::get_theme;
+use super::theme::Theme;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
+    let theme = get_theme(app);
+
     // Split into three columns
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -18,12 +21,12 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         ])
         .split(area);
 
-    draw_open_ports(frame, app, chunks[0]);
-    draw_inbound(frame, app, chunks[1]);
-    draw_outbound(frame, app, chunks[2]);
+    draw_open_ports(frame, app, chunks[0], &theme);
+    draw_inbound(frame, app, chunks[1], &theme);
+    draw_outbound(frame, app, chunks[2], &theme);
 }
 
-fn draw_open_ports(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_open_ports(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let is_focused = app.dashboard_panel == DashboardPanel::OpenPorts;
 
     let items: Vec<ListItem> = app
@@ -45,9 +48,9 @@ fn draw_open_ports(frame: &mut Frame, app: &App, area: Rect) {
             );
 
             let style = if i == app.dashboard_scroll[0] && is_focused {
-                Style::default().bg(THEME.selection_bg).fg(THEME.accent)
+                Style::default().bg(theme.selection_bg).fg(theme.accent)
             } else {
-                Style::default().fg(THEME.fg)
+                Style::default().fg(theme.fg)
             };
 
             ListItem::new(Line::from(content)).style(style)
@@ -55,20 +58,20 @@ fn draw_open_ports(frame: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let border_style = if is_focused {
-        Style::default().fg(THEME.border_focused)
+        Style::default().fg(theme.border_focused)
     } else {
-        Style::default().fg(THEME.border)
+        Style::default().fg(theme.border)
     };
 
     let block = Block::default()
         .title(format!(" Open Ports ({}) ", app.open_ports.len()))
-        .title_style(Style::default().fg(if is_focused { THEME.accent } else { THEME.fg_dim }))
+        .title_style(Style::default().fg(if is_focused { theme.accent } else { theme.fg_dim }))
         .borders(Borders::ALL)
         .border_style(border_style);
 
     // Header
     let header = Paragraph::new(Line::from(vec![
-        Span::styled(" Port │ Service      │ Process", Style::default().fg(THEME.fg_dim)),
+        Span::styled(" Port │ Service      │ Process", Style::default().fg(theme.fg_dim)),
     ]));
 
     let inner = block.inner(area);
@@ -85,7 +88,7 @@ fn draw_open_ports(frame: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-fn draw_inbound(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_inbound(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let is_focused = app.dashboard_panel == DashboardPanel::Inbound;
 
     let items: Vec<ListItem> = app
@@ -101,9 +104,9 @@ fn draw_inbound(frame: &mut Frame, app: &App, area: Rect) {
             let content = format!("{:21} → :{:<5} ({})", remote, local_port, service);
 
             let style = if i == app.dashboard_scroll[1] && is_focused {
-                Style::default().bg(THEME.selection_bg).fg(THEME.accent)
+                Style::default().bg(theme.selection_bg).fg(theme.accent)
             } else {
-                Style::default().fg(THEME.fg)
+                Style::default().fg(theme.fg)
             };
 
             ListItem::new(Line::from(content)).style(style)
@@ -111,19 +114,19 @@ fn draw_inbound(frame: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let border_style = if is_focused {
-        Style::default().fg(THEME.border_focused)
+        Style::default().fg(theme.border_focused)
     } else {
-        Style::default().fg(THEME.border)
+        Style::default().fg(theme.border)
     };
 
     let block = Block::default()
         .title(format!(" Inbound ({}) ", app.inbound_connections.len()))
-        .title_style(Style::default().fg(if is_focused { THEME.accent } else { THEME.fg_dim }))
+        .title_style(Style::default().fg(if is_focused { theme.accent } else { theme.fg_dim }))
         .borders(Borders::ALL)
         .border_style(border_style);
 
     let header = Paragraph::new(Line::from(vec![
-        Span::styled(" Remote               → Local   Service", Style::default().fg(THEME.fg_dim)),
+        Span::styled(" Remote               → Local   Service", Style::default().fg(theme.fg_dim)),
     ]));
 
     let inner = block.inner(area);
@@ -140,7 +143,7 @@ fn draw_inbound(frame: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-fn draw_outbound(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_outbound(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let is_focused = app.dashboard_panel == DashboardPanel::Outbound;
 
     let items: Vec<ListItem> = app
@@ -157,9 +160,9 @@ fn draw_outbound(frame: &mut Frame, app: &App, area: Rect) {
             let content = format!(":{:<5} → {:21} ({})", local_port, remote, service);
 
             let style = if i == app.dashboard_scroll[2] && is_focused {
-                Style::default().bg(THEME.selection_bg).fg(THEME.accent)
+                Style::default().bg(theme.selection_bg).fg(theme.accent)
             } else {
-                Style::default().fg(THEME.fg)
+                Style::default().fg(theme.fg)
             };
 
             ListItem::new(Line::from(content)).style(style)
@@ -167,19 +170,19 @@ fn draw_outbound(frame: &mut Frame, app: &App, area: Rect) {
         .collect();
 
     let border_style = if is_focused {
-        Style::default().fg(THEME.border_focused)
+        Style::default().fg(theme.border_focused)
     } else {
-        Style::default().fg(THEME.border)
+        Style::default().fg(theme.border)
     };
 
     let block = Block::default()
         .title(format!(" Outbound ({}) ", app.outbound_connections.len()))
-        .title_style(Style::default().fg(if is_focused { THEME.accent } else { THEME.fg_dim }))
+        .title_style(Style::default().fg(if is_focused { theme.accent } else { theme.fg_dim }))
         .borders(Borders::ALL)
         .border_style(border_style);
 
     let header = Paragraph::new(Line::from(vec![
-        Span::styled(" Local → Remote               Service", Style::default().fg(THEME.fg_dim)),
+        Span::styled(" Local → Remote               Service", Style::default().fg(theme.fg_dim)),
     ]));
 
     let inner = block.inner(area);

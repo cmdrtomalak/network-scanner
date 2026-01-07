@@ -5,9 +5,12 @@ use ratatui::{
 
 use crate::app::{App, InputMode};
 use crate::capture::protocol_hints::format_help_text;
-use super::theme::THEME;
+use super::get_theme;
+use super::theme::Theme;
 
 pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
+    let theme = get_theme(app);
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -17,49 +20,49 @@ pub fn draw(frame: &mut Frame, app: &App, area: Rect) {
         ])
         .split(area);
 
-    draw_controls(frame, app, chunks[0]);
-    draw_filter(frame, app, chunks[1]);
-    draw_packets(frame, app, chunks[2]);
+    draw_controls(frame, app, chunks[0], &theme);
+    draw_filter(frame, app, chunks[1], &theme);
+    draw_packets(frame, app, chunks[2], &theme);
 
     // Draw help overlay if active
     if app.sniffer_show_help {
-        draw_help_overlay(frame, area);
+        draw_help_overlay(frame, area, &theme);
     }
 }
 
-fn draw_controls(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_controls(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(THEME.border));
+        .border_style(Style::default().fg(theme.border));
 
     let status = if app.sniffer_active {
-        Span::styled(" ● Capturing", Style::default().fg(THEME.success))
+        Span::styled(" ● Capturing", Style::default().fg(theme.success))
     } else {
-        Span::styled(" ○ Paused", Style::default().fg(THEME.fg_dim))
+        Span::styled(" ○ Paused", Style::default().fg(theme.fg_dim))
     };
 
     let hex_mode = if app.sniffer_show_hex {
-        Span::styled("Hex", Style::default().fg(THEME.accent))
+        Span::styled("Hex", Style::default().fg(theme.accent))
     } else {
-        Span::styled("Text", Style::default().fg(THEME.accent))
+        Span::styled("Text", Style::default().fg(theme.accent))
     };
 
     let content = Line::from(vec![
         status,
         Span::raw("  │  "),
-        Span::styled("Packets: ", Style::default().fg(THEME.fg_dim)),
+        Span::styled("Packets: ", Style::default().fg(theme.fg_dim)),
         Span::styled(
             app.sniffer_packets.len().to_string(),
-            Style::default().fg(THEME.fg),
+            Style::default().fg(theme.fg),
         ),
         Span::raw("  │  "),
-        Span::styled("Display: ", Style::default().fg(THEME.fg_dim)),
+        Span::styled("Display: ", Style::default().fg(theme.fg_dim)),
         hex_mode,
         Span::raw("  │  "),
-        Span::styled("Interface: ", Style::default().fg(THEME.fg_dim)),
+        Span::styled("Interface: ", Style::default().fg(theme.fg_dim)),
         Span::styled(
             app.interface.as_deref().unwrap_or("default"),
-            Style::default().fg(THEME.fg),
+            Style::default().fg(theme.fg),
         ),
     ]);
 
@@ -67,32 +70,32 @@ fn draw_controls(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
-fn draw_filter(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_filter(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let is_editing = app.sniffer_filter_mode == InputMode::Editing;
 
     let border_style = if is_editing {
-        Style::default().fg(THEME.border_focused)
+        Style::default().fg(theme.border_focused)
     } else {
-        Style::default().fg(THEME.border)
+        Style::default().fg(theme.border)
     };
 
     let block = Block::default()
         .title(" Filter (BPF syntax: 'port 80', 'host 192.168.1.1', 'tcp') ")
-        .title_style(Style::default().fg(if is_editing { THEME.accent } else { THEME.fg_dim }))
+        .title_style(Style::default().fg(if is_editing { theme.accent } else { theme.fg_dim }))
         .borders(Borders::ALL)
         .border_style(border_style);
 
     let filter_text = if app.sniffer_filter.is_empty() && !is_editing {
-        Span::styled("Press 'f' to add filter...", Style::default().fg(THEME.fg_dim))
+        Span::styled("Press 'f' to add filter...", Style::default().fg(theme.fg_dim))
     } else {
-        Span::styled(&app.sniffer_filter, Style::default().fg(THEME.fg))
+        Span::styled(&app.sniffer_filter, Style::default().fg(theme.fg))
     };
 
     let paragraph = Paragraph::new(Line::from(vec![
         Span::raw(" "),
         filter_text,
         if is_editing {
-            Span::styled("█", Style::default().fg(THEME.accent))
+            Span::styled("█", Style::default().fg(theme.accent))
         } else {
             Span::raw("")
         },
@@ -102,7 +105,7 @@ fn draw_filter(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
-fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_packets(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
     let filtered = app.filtered_packets();
     let total_count = app.sniffer_packets.len();
     let filtered_count = filtered.len();
@@ -115,9 +118,9 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
 
     let block = Block::default()
         .title(title)
-        .title_style(Style::default().fg(THEME.fg_dim))
+        .title_style(Style::default().fg(theme.fg_dim))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(THEME.border));
+        .border_style(Style::default().fg(theme.border));
 
     if filtered.is_empty() {
         let message = if app.sniffer_active {
@@ -132,7 +135,7 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
 
         let paragraph = Paragraph::new(message)
             .block(block)
-            .style(Style::default().fg(THEME.fg_dim))
+            .style(Style::default().fg(theme.fg_dim))
             .alignment(Alignment::Center);
 
         frame.render_widget(paragraph, area);
@@ -159,10 +162,10 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
 
         // Protocol color
         let proto_style = match packet.transport_protocol {
-            crate::capture::packet::TransportProtocol::Tcp => Style::default().fg(THEME.info),
-            crate::capture::packet::TransportProtocol::Udp => Style::default().fg(THEME.success),
-            crate::capture::packet::TransportProtocol::Icmp => Style::default().fg(THEME.warning),
-            _ => Style::default().fg(THEME.fg_dim),
+            crate::capture::packet::TransportProtocol::Tcp => Style::default().fg(theme.info),
+            crate::capture::packet::TransportProtocol::Udp => Style::default().fg(theme.success),
+            crate::capture::packet::TransportProtocol::Icmp => Style::default().fg(theme.warning),
+            _ => Style::default().fg(theme.fg_dim),
         };
 
         // Main packet line
@@ -171,20 +174,20 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
         let hint = packet.pattern_match.as_deref().unwrap_or("");
 
         let line = Line::from(vec![
-            Span::styled(tree_icon, Style::default().fg(THEME.accent)),
+            Span::styled(tree_icon, Style::default().fg(theme.accent)),
             Span::raw(" "),
-            Span::styled(format!("{}", time), Style::default().fg(THEME.fg_dim)),
+            Span::styled(format!("{}", time), Style::default().fg(theme.fg_dim)),
             Span::raw(" "),
             Span::styled(summary, proto_style),
             if !hint.is_empty() {
-                Span::styled(format!(" [{}]", hint), Style::default().fg(THEME.accent_secondary))
+                Span::styled(format!(" [{}]", hint), Style::default().fg(theme.accent_secondary))
             } else {
                 Span::raw("")
             },
         ]);
 
         let style = if is_selected {
-            Style::default().bg(THEME.selection_bg)
+            Style::default().bg(theme.selection_bg)
         } else {
             Style::default()
         };
@@ -196,7 +199,7 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
             // Connection info
             items.push(ListItem::new(Line::from(vec![
                 Span::raw("   ├─ "),
-                Span::styled("Connection: ", Style::default().fg(THEME.fg_dim)),
+                Span::styled("Connection: ", Style::default().fg(theme.fg_dim)),
                 Span::styled(
                     format!(
                         "{}:{} → {}:{}",
@@ -205,7 +208,7 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
                         packet.ip_dst.map(|ip| ip.to_string()).unwrap_or("?".into()),
                         packet.dst_port.map(|p| p.to_string()).unwrap_or("?".into()),
                     ),
-                    Style::default().fg(THEME.fg),
+                    Style::default().fg(theme.fg),
                 ),
             ])));
 
@@ -213,24 +216,24 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
             if let Some(flags) = &packet.tcp_flags {
                 items.push(ListItem::new(Line::from(vec![
                     Span::raw("   ├─ "),
-                    Span::styled("TCP Flags: ", Style::default().fg(THEME.fg_dim)),
-                    Span::styled(flags.to_string(), Style::default().fg(THEME.info)),
+                    Span::styled("TCP Flags: ", Style::default().fg(theme.fg_dim)),
+                    Span::styled(flags.to_string(), Style::default().fg(theme.info)),
                     Span::raw(" - "),
-                    Span::styled(flags.describe(), Style::default().fg(THEME.fg_dim)),
+                    Span::styled(flags.describe(), Style::default().fg(theme.fg_dim)),
                 ])));
             }
 
             // TTL and protocol
             items.push(ListItem::new(Line::from(vec![
                 Span::raw("   ├─ "),
-                Span::styled("IP: ", Style::default().fg(THEME.fg_dim)),
+                Span::styled("IP: ", Style::default().fg(theme.fg_dim)),
                 Span::styled(
                     format!(
                         "TTL={}, Proto={}",
                         packet.ip_ttl.unwrap_or(0),
                         packet.ip_protocol.unwrap_or(0)
                     ),
-                    Style::default().fg(THEME.fg),
+                    Style::default().fg(theme.fg),
                 ),
             ])));
 
@@ -250,10 +253,10 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
 
                 items.push(ListItem::new(Line::from(vec![
                     Span::raw("   └─ "),
-                    Span::styled("Payload: ", Style::default().fg(THEME.fg_dim)),
-                    Span::styled(payload_display, Style::default().fg(THEME.fg)),
+                    Span::styled("Payload: ", Style::default().fg(theme.fg_dim)),
+                    Span::styled(payload_display, Style::default().fg(theme.fg)),
                     if packet.payload.len() > 50 {
-                        Span::styled("...", Style::default().fg(THEME.fg_dim))
+                        Span::styled("...", Style::default().fg(theme.fg_dim))
                     } else {
                         Span::raw("")
                     },
@@ -265,8 +268,8 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
                 if let Some(hint) = crate::capture::protocol_hints::get_protocol_help(pattern) {
                     items.push(ListItem::new(Line::from(vec![
                         Span::raw("   └─ "),
-                        Span::styled("⚠ ", Style::default().fg(THEME.warning)),
-                        Span::styled(hint.security_notes, Style::default().fg(THEME.warning)),
+                        Span::styled("⚠ ", Style::default().fg(theme.warning)),
+                        Span::styled(hint.security_notes, Style::default().fg(theme.warning)),
                     ])));
                 }
             }
@@ -285,7 +288,7 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-fn draw_help_overlay(frame: &mut Frame, area: Rect) {
+fn draw_help_overlay(frame: &mut Frame, area: Rect, theme: &Theme) {
     // Create centered overlay
     let overlay_area = centered_rect(80, 80, area);
 
@@ -293,16 +296,16 @@ fn draw_help_overlay(frame: &mut Frame, area: Rect) {
 
     let block = Block::default()
         .title(" Traffic Pattern Help (press Esc to close) ")
-        .title_style(Style::default().fg(THEME.accent).add_modifier(Modifier::BOLD))
+        .title_style(Style::default().fg(theme.accent).add_modifier(Modifier::BOLD))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(THEME.border_focused))
-        .style(Style::default().bg(THEME.bg));
+        .border_style(Style::default().fg(theme.border_focused))
+        .style(Style::default().bg(theme.bg));
 
     let help_text = format_help_text();
 
     let paragraph = Paragraph::new(help_text)
         .block(block)
-        .style(Style::default().fg(THEME.fg))
+        .style(Style::default().fg(theme.fg))
         .wrap(Wrap { trim: false });
 
     frame.render_widget(paragraph, overlay_area);

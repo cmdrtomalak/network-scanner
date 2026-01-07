@@ -6,6 +6,7 @@ use tokio::sync::mpsc;
 use crate::capture::{CapturedPacket, PacketSniffer, SnifferCommand};
 use crate::network::{Connection, ConnectionMonitor};
 use crate::scanner::{PortRange, ScanResult, Scanner, ServiceProbeLevel};
+use crate::ui::theme::ThemeName;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tab {
@@ -123,6 +124,7 @@ pub struct App {
     pub show_shortcuts: bool,
     pub status_message: Option<String>,
     pub status_message_time: Option<std::time::Instant>,
+    pub theme: ThemeName,
 }
 
 impl App {
@@ -170,6 +172,7 @@ impl App {
             show_shortcuts: true,
             status_message: None,
             status_message_time: None,
+            theme: ThemeName::default(),
         }
     }
 
@@ -246,6 +249,12 @@ impl App {
             // ESC or Enter dismisses status message if present
             KeyCode::Esc | KeyCode::Enter if self.status_message.is_some() => {
                 self.clear_status();
+                return false;
+            }
+            // 't' cycles through themes (global shortcut)
+            KeyCode::Char('t') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.theme = self.theme.next();
+                self.set_status(format!("Theme: {}", self.theme.name()));
                 return false;
             }
             _ => {}
@@ -785,6 +794,7 @@ impl App {
 
         let mut shortcuts = vec![
             ("Tab", "Next Tab"),
+            ("Ctrl+T", "Theme"),
             ("Ctrl+Q", "Quit"),
         ];
 
