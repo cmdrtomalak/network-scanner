@@ -122,6 +122,7 @@ pub struct App {
     // UI state
     pub show_shortcuts: bool,
     pub status_message: Option<String>,
+    pub status_message_time: Option<std::time::Instant>,
 }
 
 impl App {
@@ -168,6 +169,7 @@ impl App {
             // UI
             show_shortcuts: true,
             status_message: None,
+            status_message_time: None,
         }
     }
 
@@ -208,6 +210,26 @@ impl App {
                 }
             }
         }
+
+        // Auto-dismiss status message after 4 seconds
+        if let Some(time) = self.status_message_time {
+            if time.elapsed() >= std::time::Duration::from_secs(4) {
+                self.status_message = None;
+                self.status_message_time = None;
+            }
+        }
+    }
+
+    /// Set a status message that will auto-dismiss after 4 seconds
+    pub fn set_status(&mut self, message: String) {
+        self.status_message = Some(message);
+        self.status_message_time = Some(std::time::Instant::now());
+    }
+
+    /// Clear the status message immediately
+    pub fn clear_status(&mut self) {
+        self.status_message = None;
+        self.status_message_time = None;
     }
 
     pub async fn handle_key(&mut self, key: KeyEvent) -> bool {
@@ -223,7 +245,7 @@ impl App {
             }
             // ESC or Enter dismisses status message if present
             KeyCode::Esc | KeyCode::Enter if self.status_message.is_some() => {
-                self.status_message = None;
+                self.clear_status();
                 return false;
             }
             _ => {}
@@ -344,7 +366,7 @@ impl App {
                             self.scanner_port_range = range;
                             self.scanner_selected_preset = 3; // Custom
                         } else if !self.scanner_port_input.is_empty() {
-                            self.status_message = Some("Invalid port format. Use: 22,80,443 or 1-1024".to_string());
+                            self.set_status("Invalid port format. Use: 22,80,443 or 1-1024".to_string());
                         }
                         self.scanner_focus = ScannerFocus::Target;
                     } else {
@@ -458,7 +480,7 @@ impl App {
         let resolved_ip = match Scanner::try_resolve(&target) {
             Some(ip) => ip,
             None => {
-                self.status_message = Some(format!(
+                self.set_status(format!(
                     "Could not resolve '{}' - check hostname or use IP address",
                     target
                 ));
@@ -468,7 +490,7 @@ impl App {
 
         self.scanner_running = true;
         self.scanner_results.clear();
-        self.status_message = Some(format!("Scanning {} ({})...", target, resolved_ip));
+        self.set_status(format!("Scanning {} ({})...", target, resolved_ip));
 
         let port_range = self.scanner_port_range.clone();
         let probe_level = self.scanner_probe_level;
@@ -478,7 +500,7 @@ impl App {
 
         self.scanner_results = results.clone();
         self.scanner_running = false;
-        self.status_message = Some(format!(
+        self.set_status(format!(
             "Scan complete: {} open ports found",
             results.len()
         ));
@@ -508,7 +530,7 @@ impl App {
             self.sniffer_active = false;
             self.sniffer_cmd_tx = None;
             self.sniffer_packet_rx = None;
-            self.status_message = Some("Packet capture stopped".to_string());
+            self.set_status("Packet capture stopped".to_string());
         } else {
             // Start sniffer
             let interface = self.interface.clone();
@@ -516,14 +538,77 @@ impl App {
             self.sniffer_cmd_tx = Some(cmd_tx);
             self.sniffer_packet_rx = Some(packet_rx);
             self.sniffer_active = true;
-            self.status_message = Some("Packet capture started - packets will appear below".to_string());
+            self.set_status("Packet capture started - packets will appear below".to_string());
         }
     }
 
     async fn apply_sniffer_filter(&mut self) {
+        // The filter is applied both to BPF (for new packets) and display (for existing)
         if let Some(tx) = &self.sniffer_cmd_tx {
             let _ = tx.send(SnifferCommand::SetFilter(self.sniffer_filter.clone()));
         }
+    }
+
+    /// Get packets filtered by the current filter string
+    /// Filter matches on: port numbers, protocol names, IP addresses, service names
+    pub fn filtered_packets(&self) -> Vec<(usize, &CapturedPacket)> {
+        if self.sniffer_filter.is_empty() {
+            return self.sniffer_packets.iter().enumerate().collect();
+        }
+
+        let filter = self.sniffer_filter.to_lowercase();
+
+        self.sniffer_packets
+            .iter()
+            .enumerate()
+            .filter(|(_, packet)| {
+                // Check port numbers
+                if let Some(src_port) = packet.src_port {
+                    if src_port.to_string().contains(&filter) {
+                        return true;
+                    }
+                }
+                if let Some(dst_port) = packet.dst_port {
+                    if dst_port.to_string().contains(&filter) {
+                        return true;
+                    }
+                }
+
+                // Check protocol
+                let proto = format!("{:?}", packet.transport_protocol).to_lowercase();
+                if proto.contains(&filter) {
+                    return true;
+                }
+
+                // Check IP addresses
+                if let Some(ref ip) = packet.ip_src {
+                    if ip.to_string().contains(&filter) {
+                        return true;
+                    }
+                }
+                if let Some(ref ip) = packet.ip_dst {
+                    if ip.to_string().contains(&filter) {
+                        return true;
+                    }
+                }
+
+                // Check service/pattern match
+                if let Some(ref pattern) = packet.pattern_match {
+                    if pattern.to_lowercase().contains(&filter) {
+                        return true;
+                    }
+                }
+
+                // Check inferred service
+                if let Some(ref service) = packet.service_hint {
+                    if service.to_lowercase().contains(&filter) {
+                        return true;
+                    }
+                }
+
+                false
+            })
+            .collect()
     }
 
     async fn export_dashboard(&mut self) {
@@ -537,14 +622,14 @@ impl App {
         let filename = format!("dashboard_{}.json", chrono::Utc::now().format("%Y%m%d_%H%M%S"));
         if let Ok(json) = serde_json::to_string_pretty(&data) {
             if std::fs::write(&filename, json).is_ok() {
-                self.status_message = Some(format!("Exported to {}", filename));
+                self.set_status(format!("Exported to {}", filename));
             }
         }
     }
 
     async fn export_scan_results(&mut self) {
         if self.scanner_results.is_empty() {
-            self.status_message = Some("No scan results to export".to_string());
+            self.set_status("No scan results to export".to_string());
             return;
         }
 
@@ -558,14 +643,14 @@ impl App {
         let filename = format!("scan_{}.json", chrono::Utc::now().format("%Y%m%d_%H%M%S"));
         if let Ok(json) = serde_json::to_string_pretty(&data) {
             if std::fs::write(&filename, json).is_ok() {
-                self.status_message = Some(format!("Exported to {}", filename));
+                self.set_status(format!("Exported to {}", filename));
             }
         }
     }
 
     async fn export_packets(&mut self) {
         if self.sniffer_packets.is_empty() {
-            self.status_message = Some("No packets to export".to_string());
+            self.set_status("No packets to export".to_string());
             return;
         }
 
@@ -578,7 +663,7 @@ impl App {
         let filename = format!("packets_{}.json", chrono::Utc::now().format("%Y%m%d_%H%M%S"));
         if let Ok(json) = serde_json::to_string_pretty(&data) {
             if std::fs::write(&filename, json).is_ok() {
-                self.status_message = Some(format!("Exported to {}", filename));
+                self.set_status(format!("Exported to {}", filename));
             }
         }
     }

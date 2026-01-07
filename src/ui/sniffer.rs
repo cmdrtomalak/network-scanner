@@ -103,15 +103,29 @@ fn draw_filter(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
+    let filtered = app.filtered_packets();
+    let total_count = app.sniffer_packets.len();
+    let filtered_count = filtered.len();
+
+    let title = if app.sniffer_filter.is_empty() {
+        format!(" Captured Packets ({}) ", total_count)
+    } else {
+        format!(" Captured Packets ({}/{} matched) ", filtered_count, total_count)
+    };
+
     let block = Block::default()
-        .title(format!(" Captured Packets ({}) ", app.sniffer_packets.len()))
+        .title(title)
         .title_style(Style::default().fg(THEME.fg_dim))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(THEME.border));
 
-    if app.sniffer_packets.is_empty() {
+    if filtered.is_empty() {
         let message = if app.sniffer_active {
-            "Waiting for packets..."
+            if app.sniffer_filter.is_empty() {
+                "Waiting for packets..."
+            } else {
+                "No packets match filter"
+            }
         } else {
             "Press Space to start capturing"
         };
@@ -132,13 +146,13 @@ fn draw_packets(frame: &mut Frame, app: &App, area: Rect) {
     let mut items: Vec<ListItem> = Vec::new();
     let visible_height = inner.height as usize;
 
-    for (idx, packet) in app.sniffer_packets.iter().enumerate().skip(app.sniffer_scroll) {
+    for (display_idx, (original_idx, packet)) in filtered.iter().enumerate().skip(app.sniffer_scroll) {
         if items.len() >= visible_height {
             break;
         }
 
-        let is_selected = idx == app.sniffer_scroll;
-        let is_expanded = app.sniffer_expanded.get(&idx).copied().unwrap_or(false);
+        let is_selected = display_idx == app.sniffer_scroll;
+        let is_expanded = app.sniffer_expanded.get(original_idx).copied().unwrap_or(false);
 
         // Tree indicator
         let tree_icon = if is_expanded { "▼" } else { "▶" };
