@@ -34,7 +34,7 @@ impl Tab {
 
     pub fn title(&self) -> &'static str {
         match self {
-            Tab::Dashboard => "Dashboard",
+            Tab::Dashboard => "Machine Info",
             Tab::PortScanner => "Port Scanner",
             Tab::PacketSniffer => "Packet Sniffer",
         }
