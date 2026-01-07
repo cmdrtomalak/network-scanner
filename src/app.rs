@@ -450,6 +450,20 @@ impl App {
                         self.sniffer_scroll += 1;
                     }
                 }
+                KeyCode::PageUp => {
+                    self.sniffer_scroll = self.sniffer_scroll.saturating_sub(20);
+                }
+                KeyCode::PageDown => {
+                    let filtered_count = self.filtered_packets().len();
+                    self.sniffer_scroll = (self.sniffer_scroll + 20).min(filtered_count.saturating_sub(1));
+                }
+                KeyCode::Home => {
+                    self.sniffer_scroll = 0;
+                }
+                KeyCode::End => {
+                    let filtered_count = self.filtered_packets().len();
+                    self.sniffer_scroll = filtered_count.saturating_sub(1);
+                }
                 KeyCode::Enter => {
                     // Get the original packet index from the filtered list
                     let filtered = self.filtered_packets();
@@ -850,6 +864,8 @@ impl App {
                                 ("c", "Clear"),
                                 ("Enter", "Expand/Collapse"),
                                 ("↑/↓", "Scroll"),
+                                ("PgUp/Dn", "Page Scroll"),
+                                ("Home/End", "Jump"),
                                 ("e", "Export"),
                             ]);
                         }
