@@ -425,7 +425,7 @@ impl App {
                 KeyCode::Char(' ') => {
                     self.toggle_sniffer().await;
                 }
-                KeyCode::Char('f') => {
+                KeyCode::Char('f') | KeyCode::Char('/') => {
                     self.sniffer_filter_mode = InputMode::Editing;
                 }
                 KeyCode::Char('h') => {
@@ -858,7 +858,7 @@ impl App {
                         InputMode::Normal => {
                             shortcuts.extend([
                                 ("Space", if self.sniffer_active { "Pause" } else { "Start" }),
-                                ("f", "Filter"),
+                                ("f,/", "Filter"),
                                 ("h", "Toggle Hex"),
                                 ("?", "Help"),
                                 ("c", "Clear"),
