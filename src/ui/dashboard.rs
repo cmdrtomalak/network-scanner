@@ -39,12 +39,22 @@ fn draw_open_ports(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
                 .unwrap_or("unknown");
 
             let process = conn.process_name.as_deref().unwrap_or("-");
+            let mut process_truncated = process.to_string();
+            if process_truncated.len() > 20 {
+                process_truncated.truncate(17);
+                process_truncated.push_str("...");
+            }
+
+            let pid_str = conn.pid.map(|p| p.to_string()).unwrap_or_else(|| "-".to_string());
+            let gid_str = conn.gid.map(|g| g.to_string()).unwrap_or_else(|| "-".to_string());
 
             let content = format!(
-                "{:>5} │ {:12} │ {}",
+                "{:>5} │ {:15} │ {:20} │ {:>8} │ {:>8}",
                 conn.local_port,
                 service,
-                process
+                process_truncated,
+                pid_str,
+                gid_str
             );
 
             let style = if i == app.dashboard_scroll[0] && is_focused {
@@ -71,7 +81,7 @@ fn draw_open_ports(frame: &mut Frame, app: &App, area: Rect, theme: &Theme) {
 
     // Header
     let header = Paragraph::new(Line::from(vec![
-        Span::styled(" Port │ Service      │ Process", Style::default().fg(theme.fg_dim)),
+        Span::styled(" Port │ Service         │ Process              │      PID │      GID", Style::default().fg(theme.fg_dim)),
     ]));
 
     let inner = block.inner(area);

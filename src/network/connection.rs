@@ -10,6 +10,7 @@ pub struct Connection {
     pub remote_port: Option<u16>,
     pub state: String,
     pub pid: Option<u32>,
+    pub gid: Option<u32>,
     pub process_name: Option<String>,
     pub is_inbound: bool,
 }

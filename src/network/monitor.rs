@@ -114,6 +114,7 @@ impl ConnectionMonitor {
                 remote_port,
                 state,
                 pid: None,
+                gid: None,
                 process_name: None,
                 is_inbound,
             });
@@ -157,6 +158,8 @@ impl ConnectionMonitor {
                 (None, None)
             };
 
+            let gid = pid.and_then(Self::get_gid_from_pid);
+
             let is_inbound = local_port < 1024 || (remote_port.map(|p| p >= 1024).unwrap_or(false) && local_port < remote_port.unwrap_or(0));
 
             connections.push(Connection {
@@ -167,12 +170,48 @@ impl ConnectionMonitor {
                 remote_port,
                 state,
                 pid,
+                gid,
                 process_name,
                 is_inbound,
             });
         }
 
         connections
+    }
+
+    fn get_gid_from_pid(pid: u32) -> Option<u32> {
+        #[cfg(target_os = "linux")]
+        {
+            use std::io::Read;
+            let path = format!("/proc/{}/status", pid);
+            if let Ok(mut file) = std::fs::File::open(&path) {
+                let mut contents = String::new();
+                if file.read_to_string(&mut contents).is_ok() {
+                    for line in contents.lines() {
+                        if line.starts_with("Gid:") {
+                            let parts: Vec<&str> = line.split_whitespace().collect();
+                            if parts.len() >= 3 {
+                                return parts[2].parse().ok(); // Real, Effective, Saved, FS
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+             if let Ok(output) = Command::new("ps")
+                .args(["-p", &pid.to_string(), "-o", "gid="])
+                .output()
+            {
+                if let Ok(s) = String::from_utf8(output.stdout) {
+                    return s.trim().parse().ok();
+                }
+            }
+        }
+
+        None
     }
 
     fn parse_address(addr_str: &str) -> Option<(IpAddr, u16)> {
@@ -255,6 +294,9 @@ impl ConnectionMonitor {
                                     if conn.local_port == port && conn.process_name.is_none() {
                                         conn.process_name = Some(process_name.clone());
                                         conn.pid = pid;
+                                        if let Some(p) = pid {
+                                            conn.gid = Self::get_gid_from_pid(p);
+                                        }
                                     }
                                 }
                             }
