@@ -142,6 +142,7 @@ impl CapturedPacket {
         )
     }
 
+    #[allow(dead_code)]
     pub fn hex_dump(&self) -> String {
         let mut result = String::new();
         for (i, chunk) in self.payload.chunks(16).enumerate() {

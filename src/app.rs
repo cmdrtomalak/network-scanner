@@ -121,7 +121,6 @@ pub struct App {
     pub sniffer_packet_rx: Option<mpsc::UnboundedReceiver<CapturedPacket>>,
 
     // UI state
-    pub show_shortcuts: bool,
     pub status_message: Option<String>,
     pub status_message_time: Option<std::time::Instant>,
     pub theme: ThemeName,
@@ -169,7 +168,6 @@ impl App {
             sniffer_packet_rx: None,
 
             // UI
-            show_shortcuts: true,
             status_message: None,
             status_message_time: None,
             theme: ThemeName::default(),
@@ -835,7 +833,7 @@ impl App {
                         ]);
                     }
                     InputMode::Editing => {
-                        let field = match self.scanner_focus {
+                        let _field = match self.scanner_focus {
                             ScannerFocus::Target => "Target",
                             ScannerFocus::Ports => "Ports",
                         };

@@ -88,7 +88,7 @@ impl PacketSniffer {
         log::info!("Datalink type: {:?}", datalink);
 
         let mut packet_id = 0usize;
-        let mut active = true;
+        let active = true;
 
         loop {
             // Check for commands (non-blocking)

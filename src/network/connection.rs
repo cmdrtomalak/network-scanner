@@ -16,6 +16,7 @@ pub struct Connection {
 }
 
 impl Connection {
+    #[allow(dead_code)]
     pub fn format_local(&self) -> String {
         format!("{}:{}", self.local_addr, self.local_port)
     }
@@ -27,6 +28,7 @@ impl Connection {
         }
     }
 
+    #[allow(dead_code)]
     pub fn service_name(&self) -> Option<&'static str> {
         get_service_name(self.local_port)
     }
