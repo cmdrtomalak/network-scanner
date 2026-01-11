@@ -10,11 +10,13 @@ pub struct Connection {
     pub remote_port: Option<u16>,
     pub state: String,
     pub pid: Option<u32>,
+    pub gid: Option<u32>,
     pub process_name: Option<String>,
     pub is_inbound: bool,
 }
 
 impl Connection {
+    #[allow(dead_code)]
     pub fn format_local(&self) -> String {
         format!("{}:{}", self.local_addr, self.local_port)
     }
@@ -26,6 +28,7 @@ impl Connection {
         }
     }
 
+    #[allow(dead_code)]
     pub fn service_name(&self) -> Option<&'static str> {
         get_service_name(self.local_port)
     }
