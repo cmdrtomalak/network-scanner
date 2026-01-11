@@ -287,16 +287,20 @@ impl ConnectionMonitor {
 
                     // Parse the address from lsof (format: host:port or host:port->remote:port)
                     let addr_info = parts[8];
-                    if let Some((local, _)) = addr_info.split_once("->") {
-                        if let Some((_, port_str)) = local.rsplit_once(':') {
-                            if let Ok(port) = port_str.parse::<u16>() {
-                                for conn in connections.iter_mut() {
-                                    if conn.local_port == port && conn.process_name.is_none() {
-                                        conn.process_name = Some(process_name.clone());
-                                        conn.pid = pid;
-                                        if let Some(p) = pid {
-                                            conn.gid = Self::get_gid_from_pid(p);
-                                        }
+                    let local_part = if let Some((local, _)) = addr_info.split_once("->") {
+                        local
+                    } else {
+                        addr_info
+                    };
+
+                    if let Some((_, port_str)) = local_part.rsplit_once(':') {
+                        if let Ok(port) = port_str.parse::<u16>() {
+                            for conn in connections.iter_mut() {
+                                if conn.local_port == port && conn.process_name.is_none() {
+                                    conn.process_name = Some(process_name.clone());
+                                    conn.pid = pid;
+                                    if let Some(p) = pid {
+                                        conn.gid = Self::get_gid_from_pid(p);
                                     }
                                 }
                             }
